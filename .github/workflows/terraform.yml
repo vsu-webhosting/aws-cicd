@@ -1,29 +1,73 @@
-name: Terraform Deploy
+name: Terraform CI/CD
  
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+ 
+  push:
+    branches:
+      - main
  
 permissions:
   id-token: write
   contents: read
  
 jobs:
-  terraform:
+ 
+  # ✅ PLAN JOB (Runs on PR only)
+  terraform-plan:
+    name: Terraform Plan (PR)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
  
-    # ✅ prevents parallel runs
     concurrency:
       group: terraform
       cancel-in-progress: false
  
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
  
-      - name: AWS Login using OIDC
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/GitHubTerraformRole
+          aws-region: us-east-1
+ 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+ 
+      - name: Terraform Init
+        run: terraform init
+ 
+      - name: Terraform Validate
+        run: terraform validate
+ 
+      - name: Terraform Format Check
+        run: terraform fmt -check
+ 
+      - name: Terraform Plan
+        run: terraform plan
+ 
+  # ✅ APPLY JOB (Runs ONLY after PR merge to main)
+  terraform-apply:
+    name: Terraform Apply (After Merge)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+ 
+    concurrency:
+      group: terraform
+      cancel-in-progress: false
+ 
+    # ✅ Optional: Add approval gate (recommended)
+    # environment: production
+ 
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+ 
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::035711439183:role/vsugithubrole
@@ -32,14 +76,8 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
  
-      - name: Init
+      - name: Terraform Init
         run: terraform init
  
-      - name: Validate
-        run: terraform validate
- 
-      - name: Plan
-        run: terraform plan
- 
-      - name: Apply
+      - name: Terraform Apply
         run: terraform apply -auto-approve
