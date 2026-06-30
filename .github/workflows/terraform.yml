@@ -1,0 +1,45 @@
+name: Terraform Deploy
+ 
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+ 
+permissions:
+  id-token: write
+  contents: read
+ 
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+ 
+    # ✅ prevents parallel runs
+    concurrency:
+      group: terraform
+      cancel-in-progress: false
+ 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: AWS Login using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::035711439183:role/vsugithubrole
+          aws-region: us-east-1
+ 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+ 
+      - name: Init
+        run: terraform init
+ 
+      - name: Validate
+        run: terraform validate
+ 
+      - name: Plan
+        run: terraform plan
+ 
+      - name: Apply
+        run: terraform apply -auto-approve
